@@ -7,7 +7,10 @@ Automatically detects new posts made on Reddit that match the specified queries 
 ![img](https://i.imgur.com/KQ1hzg6.png)
 
 ## Overview
-This bot primarily uses the Discord API (through [JDA](https://github.com/DV8FromTheWorld/JDA)) and the Reddit API (through [JRAW](https://github.com/mattbdean/JRAW)), in conjuction with a MongoDB for the backend (through the [MongoDB Java Driver](https://docs.mongodb.com/drivers/java/sync/current/)). 
+This bot primarily uses the Discord API (through [JDA](https://github.com/DV8FromTheWorld/JDA)) and the Reddit API (through [JRAW](https://github.com/mattbdean/JRAW)), in conjuction with a MongoDB for the backend (through the [MongoDB Java Driver](https://docs.mongodb.com/drivers/java/sync/current/)) The database set up by this project uses hashed and compound indexes when appropriate, ensuring ```O(log(n))``` performance for queries. 
+
+This is a rewrite of an [old version](https://github.com/eric-lu-VT/DEPRECATED-Reddit-Discord-Alert) of this project. Porting over from JavaScript to Java was necessary for multithreading capabilities, which allow for individual servers to run the primary script concurrently with one another. It also allows for each individual server to control ```/start``` and ```/stop``` of their respective scripts.
+
 Here is a pseudocode outline of how the bot works:
 - On login, initialize commands to Discord API.
 - When a Discord server requests to start script (```/start```)
@@ -20,6 +23,9 @@ Here is a pseudocode outline of how the bot works:
     - If user runs comamand ( ```/ping``` or ```/addchannel``` or ```/removechannel``` or  ```/addquery [query] [subreddit]``` or ```/removequery [query] [subreddit]```), respond appropriately
     - If Bot is added to new server, add the corresponding server info to the database
     - If Bot is removed from a server, remove the corresponding server info from the database
+- For read/write requests to database, keep operations in sync with ```updateRedditLock``` and ```otherLock```.
+  - ```updateRedditLock``` is a lock for the ```updateReddit(...)``` method, while ```otherLock``` is a lock for all the other read/write methods. 
+    - No need for special locks for each method; MongoDB automatically handles it for multiple concurrent operations to a single document, as described [here](https://docs.mongodb.com/manual/core/write-operations-atomicity/).
 
 ### Commands
 - ```/ping```: Replies with pong!
