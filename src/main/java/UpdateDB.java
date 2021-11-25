@@ -41,6 +41,9 @@ public class UpdateDB {
     private MongoClient mongoClient;
     private JDA jda;
 
+    private boolean updateRedditLock;
+    private boolean otherLock;
+
     public UpdateDB(String REDDITUSERUSERNAME, String REDDITUSERPASSWORD, String REDDITBOTID, String REDDITBOTSECRET, String MONGOURI, JDA jda) {
         userAgent = new UserAgent("bot", "bot", "v1.0", REDDITUSERUSERNAME);
         credentials = Credentials.script(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET);
@@ -48,9 +51,13 @@ public class UpdateDB {
         reddit = OAuthHelper.automatic(adapter, credentials);
         mongoClient = MongoClients.create(MONGOURI);
         this.jda = jda;
+        updateRedditLock = false;
+        otherLock = false;
     }
 
     public synchronized void updateReddit(String guildId) {
+        takeUpdateRedditLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> serverposts = database.getCollection("serverposts");
 
@@ -113,10 +120,14 @@ public class UpdateDB {
                 }
             });
         });
+
         System.out.println(guildId + " finished a search run");
+        releaseUpdateRedditLock();
     }
 
     public synchronized void setIndexes() {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
 
         MongoCollection<Document> serverposts = database.getCollection("serverposts");
@@ -126,9 +137,13 @@ public class UpdateDB {
         redditposts.createIndex(Indexes.compoundIndex(Indexes.descending("postId"), Indexes.ascending("guildId")));
         redditposts.createIndex(Indexes.ascending("date"),
                 new IndexOptions().expireAfter(1L, TimeUnit.MINUTES));
+
+        releaseOtherLock();
     }
 
     public synchronized void addGuild(String guildID, List<String> channels) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
@@ -140,17 +155,25 @@ public class UpdateDB {
                     .append("_id", new ObjectId())
                     .append("query", "afhafafajhfaj")           // TODO: figure out how to not need dummy entry here
                     .append("subreddit", "jahgajgajgajk"))));
+
+        releaseOtherLock();
     }
 
     public synchronized void removeGuild(String guildId) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
         Bson queryFilter = eq("guildId", guildId);
         collection.deleteOne(queryFilter);
+
+        releaseOtherLock();
     }
 
     public synchronized void addChannel(String guildId, String channelId) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
@@ -158,18 +181,26 @@ public class UpdateDB {
         Bson update = Updates.push("channels", channelId);
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions().upsert(true);
         collection.findOneAndUpdate(queryFilter, update, updateOptions);
+
+        releaseOtherLock();
     }
 
     public synchronized void removeChannel(String guildId, String channelId) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
         Bson queryFilter = eq("guildId", guildId);
         Bson update = Updates.pull("channels", channelId);
         collection.updateOne(queryFilter, update);
+
+        releaseOtherLock();
     }
 
     public synchronized boolean addQuery(String guildId, String queryStr, String subredditStr) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
@@ -185,10 +216,14 @@ public class UpdateDB {
                 .append("subreddit", subredditStr));
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions().upsert(true);
         collection.findOneAndUpdate(queryFilter, update, updateOptions);
+
+        releaseOtherLock();
         return true;
     }
 
     public synchronized boolean removeQuery(String guildId, String queryStr, String subredditStr) {
+        takeOtherLock();
+
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
         MongoCollection<Document> collection = database.getCollection("serverposts");
 
@@ -201,6 +236,42 @@ public class UpdateDB {
                                                                      .append("subreddit", subredditStr));
         Bson update = new Document("$pull", fields);
         collection.updateOne(queryFilter, update);
+
+        releaseOtherLock();
         return true;
+    }
+
+    private synchronized void takeUpdateRedditLock() {
+        while(updateRedditLock && otherLock) {
+            try {
+                wait();
+            }
+            catch(InterruptedException e) {
+                // do nothing; smother
+            }
+        }
+        updateRedditLock = true;
+    }
+
+    private synchronized void releaseUpdateRedditLock() {
+        updateRedditLock = false;
+        notifyAll();
+    }
+
+    private synchronized void takeOtherLock()  {
+        while(updateRedditLock) {
+            try {
+                wait();
+            }
+            catch(InterruptedException e) {
+                // do nothing; smother
+            }
+        }
+        otherLock = true;
+    }
+
+    private synchronized void releaseOtherLock() {
+        otherLock = false;
+        notifyAll();
     }
 }

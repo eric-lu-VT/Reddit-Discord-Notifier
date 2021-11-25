@@ -20,8 +20,8 @@ import org.bson.Document;
 public class Bot extends ListenerAdapter {
 
     private static final String DISCORDBOTTOKEN = System.getenv("DISCORDBOTTOKEN");
-    private static final String DISCORDID = System.getenv("DISCORDID");
-    private static final String USERAGENT = "Whatever";
+    // private static final String DISCORDID = System.getenv("DISCORDID");
+    // private static final String USERAGENT = "Whatever";
     private static final String REDDITBOTID = System.getenv("REDDITBOTID");
     private static final String REDDITBOTSECRET = System.getenv("REDDITBOTSECRET");
     private static final String REDDITUSERUSERNAME = System.getenv("REDDITUSERUSERNAME");
@@ -42,7 +42,7 @@ public class Bot extends ListenerAdapter {
         jda.upsertCommand("start", "Starts test loop").queue();
         jda.upsertCommand("stop", "Stops test loop").queue();
         jda.upsertCommand("addchannel", "Allows the bot to post in the channel in which the command was sent.").queue();
-        jda.upsertCommand("removechannel", "Revokes the bot\\'s access to post in the channel in which the command was sent.").queue();
+        jda.upsertCommand("removechannel", "Revokes the bot's access to post in the channel in which the command was sent.").queue();
         jda.upsertCommand("addquery", "Adds a new query to the search list attributed to the respective Discord server.")
                 .addOption(OptionType.STRING, "query-subreddit", "/addquery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
         jda.upsertCommand("removequery", "Removes a query from the search list attributed to the respective Discord server.")
@@ -69,22 +69,52 @@ public class Bot extends ListenerAdapter {
         }
         else if(event.getName().equals("start")) {
             if(map.containsKey(event.getGuild().getId())) {
-                event.reply("Script already running!").queue();
+                EmbedBuilder embd = new EmbedBuilder();
+                embd.setColor(0xe74c3c)
+                        .setTitle("Failed to start script...")
+                        .setDescription("Script is already running.")
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
             else {
                 map.put(event.getGuild().getId(), new GuildWorker(event.getGuild().getId(), semaphore));
                 map.get(event.getGuild().getId()).start();
-                event.reply("Starting script").queue();
+
+                EmbedBuilder embd = new EmbedBuilder();
+                embd.setColor(0x33cc66)
+                        .setTitle("Started script!")
+                        .setDescription("Started running the script in the server.")
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
         }
         else if(event.getName().equals("stop")) {
             if(!map.containsKey(event.getGuild().getId())) {
-                event.reply("Script already stopped!").queue();
+                EmbedBuilder embd = new EmbedBuilder();
+                embd.setColor(0xe74c3c)
+                        .setTitle("Failed to stop script...")
+                        .setDescription("Script is not running currently.")
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
             else {
                 map.get(event.getGuild().getId()).stopActive();
                 map.remove(event.getGuild().getId());
-                event.reply("Stopping script").queue();
+
+                EmbedBuilder embd = new EmbedBuilder();
+                embd.setColor(0x33cc66)
+                        .setTitle("Stopped script!")
+                        .setDescription("Stopped running the script in the server.")
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
         }
         else if(event.getName().equals("addchannel")) {

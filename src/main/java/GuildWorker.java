@@ -29,7 +29,6 @@ public class GuildWorker extends Thread {
     }
 
     public void stopActive() {
-        System.out.println("Stopping " + guildId);
         active = false;
     }
 }
