@@ -4,8 +4,7 @@ Automatically detects new posts made on Reddit that match the specified queries 
 
 ## Impressions
 
-![img]()
-![img]()
+![img](https://i.imgur.com/KQ1hzg6.png)
 
 ## Overview
 This bot primarily uses the Discord API (through [JDA](https://github.com/DV8FromTheWorld/JDA)) and the Reddit API (through [JRAW](https://github.com/mattbdean/JRAW)), in conjuction with a MongoDB for the backend (through the [MongoDB Java Driver](https://docs.mongodb.com/drivers/java/sync/current/)). 
