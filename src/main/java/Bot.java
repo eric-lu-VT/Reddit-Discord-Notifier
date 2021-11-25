@@ -40,12 +40,12 @@ public class Bot extends ListenerAdapter {
     public static void main(String[] args) throws LoginException {
         jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
         jda.getPresence().setStatus(OnlineStatus.IDLE);
-        jda.getPresence().setActivity(Activity.watching("Test"));
+        jda.getPresence().setActivity(Activity.watching("Script not running currently"));
         jda.addEventListener(new Bot());
 
         jda.upsertCommand("ping", "Replies with pong!").queue();
-        jda.upsertCommand("start", "Starts test loop").queue();
-        jda.upsertCommand("stop", "Stops test loop").queue();
+        jda.upsertCommand("start", "Starts the primary script for detecting new Reddit posts, and posting them on Discord.").queue();
+        jda.upsertCommand("stop", "Stops running the primary script.").queue();
         jda.upsertCommand("addchannel", "Allows the bot to post in the channel in which the command was sent.").queue();
         jda.upsertCommand("removechannel", "Revokes the bot's access to post in the channel in which the command was sent.").queue();
         jda.upsertCommand("addquery", "Adds a new query to the search list attributed to the respective Discord server.")
@@ -107,6 +107,8 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
             else {
+                jda.getPresence().setActivity(Activity.watching("Script running currently!"));
+
                 map.put(event.getGuild().getId(), new GuildWorker(event.getGuild().getId()));
                 map.get(event.getGuild().getId()).start();
 
@@ -132,6 +134,8 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
             else {
+                jda.getPresence().setActivity(Activity.watching("Script not running currently"));
+
                 map.get(event.getGuild().getId()).stopActive();
                 map.remove(event.getGuild().getId());
 

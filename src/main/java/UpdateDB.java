@@ -102,10 +102,10 @@ public class UpdateDB {
                         .query(query)
                         .build();
 
-                // double for loop here = for each query result from the Reddit search
+                // double for loop here = for each result from the Reddit search
                 for(Listing<Submission> nextPage : paginator) {
                     for(Submission s : nextPage) {
-                        // Check database if the query has been searched for, and from the current server.
+                        // Check database if results has been searched for, and from the current server.
                         MongoCollection<Document> redditposts = database.getCollection("redditposts");
                         FindIterable<Document> iterable = redditposts.find(Projections.fields(
                                 and(eq("postId", s.getFullName()), eq("guildId", guildId))));
@@ -166,7 +166,7 @@ public class UpdateDB {
         MongoCollection<Document> redditposts = database.getCollection("redditposts");
         redditposts.createIndex(Indexes.compoundIndex(Indexes.descending("postId"), Indexes.ascending("guildId")));
         redditposts.createIndex(Indexes.ascending("date"),
-                new IndexOptions().expireAfter(2L, TimeUnit.HOURS)); // can change based on testing
+                new IndexOptions().expireAfter(2L, TimeUnit.HOURS)); // TODO: can change based on testing
 
         releaseOtherLock();
     }
