@@ -1,4 +1,5 @@
 import java.net.UnknownHostException;
+import java.time.*;
 import java.util.*;
 import javax.security.auth.login.LoginException;
 
@@ -35,6 +36,8 @@ public class Bot extends ListenerAdapter {
         semaphore = new UpdateDB(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET, MONGOURI);
         semaphore.setIndexes();
 
+        semaphore.addQuery("713927595644682290", "bob", "nfl");
+
         JDA jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
         jda.getPresence().setStatus(OnlineStatus.IDLE);
         jda.getPresence().setActivity(Activity.watching("Test"));
@@ -46,9 +49,9 @@ public class Bot extends ListenerAdapter {
         jda.upsertCommand("addchannel", "Allows the bot to post in the channel in which the command was sent.").queue();
         jda.upsertCommand("removechannel", "Revokes the bot\\'s access to post in the channel in which the command was sent.").queue();
         jda.upsertCommand("addquery", "Adds a new query to the search list attributed to the respective Discord server.")
-                .addOption(OptionType.USER, "res", "/addquery [query] [subreddit] (Subreddit is last space separated keyword provided; default = all)", true).queue();
+                .addOption(OptionType.STRING, "query-subreddit", "/addquery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
         jda.upsertCommand("removequery", "Removes a query from the search list attributed to the respective Discord server.")
-                .addOption(OptionType.USER, "res", "/removequery [query] [subreddit] (Subreddit is last space separated keyword provided; default = all)", true).queue();
+                .addOption(OptionType.STRING, "query-subreddit", "/removequery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
     }
 
     @Override
@@ -87,17 +90,113 @@ public class Bot extends ListenerAdapter {
         }
         else if(event.getName().equals("addchannel")) {
             semaphore.addChannel(event.getGuild().getId(), event.getChannel().getId());
-            event.reply("Added channel " + event.getChannel().getId()).queue();
+
+            EmbedBuilder embd = new EmbedBuilder();
+            embd.setColor(0x33cc66)
+                .setTitle("Added channel!")
+                .setDescription("Added the following channel:")
+                .addField("Channel", event.getChannel().getId(), false)
+                .addField("Server", event.getGuild().getId(), false)
+                .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                .setTimestamp(Instant.now());
+
+            event.replyEmbeds(Arrays.asList(embd.build())).queue();
         }
         else if(event.getName().equals("removechannel")) {
             semaphore.removeChannel(event.getGuild().getId(), event.getChannel().getId());
-            event.reply("Removed channel " + event.getChannel().getId()).queue();
+
+            EmbedBuilder embd = new EmbedBuilder();
+            embd.setColor(0x33cc66)
+                    .setTitle("Removed channel!")
+                    .setDescription("Removed the following channel:")
+                    .addField("Channel", event.getChannel().getId(), false)
+                    .addField("Server", event.getGuild().getId(), false)
+                    .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                    .setTimestamp(Instant.now());
+
+            event.replyEmbeds(Arrays.asList(embd.build())).queue();
         }
         else if(event.getName().equals("addquery")) {
-            System.out.println(event.getOption("res").getAsString());
+            String[] query = event.getOption("query-subreddit").getAsString().split(" ");
+            StringBuilder queryStr = new StringBuilder(), subredditStr = new StringBuilder();
+
+            if(query.length >= 1) {
+                if(query.length == 1) {
+                    queryStr.append(query[0].toLowerCase());
+                    subredditStr.append("all");
+                }
+                else {
+                    for(int i = 0; i < query.length - 1; i++) {
+                        queryStr.append(query[i].toLowerCase());
+                    }
+                    subredditStr.append(query[query.length - 1].toLowerCase());
+                }
+            }
+
+            EmbedBuilder embd = new EmbedBuilder();
+            if(!semaphore.addQuery(event.getGuild().getId(), queryStr.toString(), subredditStr.toString())) {
+                embd.setColor(0xe74c3c)
+                        .setTitle("Failed to add query...")
+                        .setDescription("The following query already exists:")
+                        .addField("Query", queryStr.toString(), false)
+                        .addField("Subreddit", subredditStr.toString(), false)
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
+            }
+            else {
+                embd.setColor(0x33cc66)
+                        .setTitle("Added query!")
+                        .setDescription("Added the following query:")
+                        .addField("Query", queryStr.toString(), false)
+                        .addField("Subreddit", subredditStr.toString(), false)
+                        .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                        .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
+            }
         }
         else if(event.getName().equals("removequery")) {
-            System.out.println(event.getOption("res").getAsString());
+            String[] query = event.getOption("query-subreddit").getAsString().split(" ");
+            StringBuilder queryStr = new StringBuilder(), subredditStr = new StringBuilder();
+
+            if(query.length >= 1) {
+                if(query.length == 1) {
+                    queryStr.append(query[0].toLowerCase());
+                    subredditStr.append("all");
+                }
+                else {
+                    for(int i = 0; i < query.length - 1; i++) {
+                        queryStr.append(query[i].toLowerCase());
+                    }
+                    subredditStr.append(query[query.length - 1].toLowerCase());
+                }
+            }
+
+            EmbedBuilder embd = new EmbedBuilder();
+            if(!semaphore.removeQuery(event.getGuild().getId(), queryStr.toString(), subredditStr.toString())) {
+                embd.setColor(0xe74c3c)
+                    .setTitle("Failed to remove query...")
+                    .setDescription("The following query does not exist in the database:")
+                    .addField("Query", queryStr.toString(), false)
+                    .addField("Subreddit", subredditStr.toString(), false)
+                    .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                    .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
+            }
+            else {
+                embd.setColor(0x33cc66)
+                    .setTitle("Removed query!")
+                    .setDescription("Removed the following query:")
+                    .addField("Query", queryStr.toString(), false)
+                    .addField("Subreddit", subredditStr.toString(), false)
+                    .setAuthor(event.getMember().getEffectiveName(), event.getMember().getUser().getAvatarUrl(), event.getMember().getUser().getAvatarUrl())
+                    .setTimestamp(Instant.now());
+
+                event.replyEmbeds(Arrays.asList(embd.build())).queue();
+            }
         }
     }
 

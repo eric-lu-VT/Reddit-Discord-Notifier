@@ -1,11 +1,12 @@
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.*;
+
+import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Projections.*;
 
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import net.dean.jraw.RedditClient;
 import net.dean.jraw.http.NetworkAdapter;
@@ -41,11 +42,6 @@ public class UpdateDB {
         adapter = new OkHttpNetworkAdapter(userAgent);
         reddit = OAuthHelper.automatic(adapter, credentials);
         mongoClient = MongoClients.create(MONGOURI);
-
-        MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
-        MongoCollection<Document> collection = database.getCollection("serverposts");
-        Document doc = collection.find(eq("_id", "713927595644682290")).first();
-        // System.out.println(doc.toJson());
     }
 
     public synchronized void updateReddit(String guildId) {
@@ -84,7 +80,7 @@ public class UpdateDB {
             .append("channels", channels)
             .append("queries", Arrays.asList(new Document()
                     .append("_id", new ObjectId())
-                    .append("query", "afhafafajhfaj")
+                    .append("query", "afhafafajhfaj")           // TODO: figure out how to not need dummy entry here
                     .append("subreddit", "jahgajgajgajk"))));
     }
 
@@ -115,11 +111,38 @@ public class UpdateDB {
         collection.updateOne(queryFilter, update);
     }
 
-    public boolean addQuery(String guildId, String queryStr, String subredditStr) {
-        return false;
+    public synchronized boolean addQuery(String guildId, String queryStr, String subredditStr) {
+        MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
+        MongoCollection<Document> collection = database.getCollection("serverposts");
+
+        Bson queryFilter = eq("guildId", guildId);
+        Bson projection = Projections.fields( elemMatch("queries", and(eq("query", queryStr), eq("subreddit", subredditStr)))); // Add Projections
+        FindIterable<Document> iterable = collection.find(queryFilter).filter(projection);
+
+        if(iterable.iterator().hasNext()) return false; // already has query to add
+
+        Bson update = Updates.push("queries", new Document()
+                .append("_id", new ObjectId())
+                .append("query", queryStr)
+                .append("subreddit", subredditStr));
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions().upsert(true);
+        collection.findOneAndUpdate(queryFilter, update, updateOptions);
+        return true;
     }
 
-    public boolean removeQuery(String guildId, String queryStr, String subredditStr) {
-        return false;
+    public synchronized boolean removeQuery(String guildId, String queryStr, String subredditStr) {
+        MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
+        MongoCollection<Document> collection = database.getCollection("serverposts");
+
+        Bson queryFilter = eq("guildId", guildId);
+        Bson projection = Projections.fields( elemMatch("queries", and(eq("query", queryStr), eq("subreddit", subredditStr)))); // Add Projections
+        FindIterable<Document> iterable = collection.find(queryFilter).filter(projection);
+        if(!iterable.iterator().hasNext()) return false; // does not have query to remove
+
+        Bson fields = new Document().append("queries", new Document().append("query", queryStr)
+                                                                     .append("subreddit", subredditStr));
+        Bson update = new Document("$pull", fields);
+        collection.updateOne(queryFilter, update);
+        return true;
     }
 }
