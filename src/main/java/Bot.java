@@ -30,15 +30,10 @@ public class Bot extends ListenerAdapter {
 
     private static Map<String, GuildWorker> map;
     private static UpdateDB semaphore;
+    private static JDA jda;
 
-    public static void main(String[] args) throws LoginException, InterruptedException, UnknownHostException {
-        map = new HashMap<>();
-        semaphore = new UpdateDB(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET, MONGOURI);
-        semaphore.setIndexes();
-
-        semaphore.addQuery("713927595644682290", "bob", "nfl");
-
-        JDA jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
+    public static void main(String[] args) throws LoginException {
+        jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
         jda.getPresence().setStatus(OnlineStatus.IDLE);
         jda.getPresence().setActivity(Activity.watching("Test"));
         jda.addEventListener(new Bot());
@@ -52,6 +47,10 @@ public class Bot extends ListenerAdapter {
                 .addOption(OptionType.STRING, "query-subreddit", "/addquery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
         jda.upsertCommand("removequery", "Removes a query from the search list attributed to the respective Discord server.")
                 .addOption(OptionType.STRING, "query-subreddit", "/removequery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
+
+        map = new HashMap<>();
+        semaphore = new UpdateDB(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET, MONGOURI, jda);
+        semaphore.setIndexes();
     }
 
     @Override
@@ -213,8 +212,6 @@ public class Bot extends ListenerAdapter {
             }
         }
         semaphore.addGuild(event.getGuild().getId(), channels);
-
-        System.out.println("Guild joined: " + event.getGuild());
     }
 
     @Override
@@ -224,7 +221,5 @@ public class Bot extends ListenerAdapter {
             map.get(event.getGuild().getId()).stopActive();
             map.remove(event.getGuild().getId());
         }
-
-        System.out.println("Guild leave: " + event.getGuild());
     }
 }

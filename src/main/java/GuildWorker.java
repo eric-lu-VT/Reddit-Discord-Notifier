@@ -15,13 +15,10 @@ public class GuildWorker extends Thread {
 
     @Override
     public void run() {
-        int i = 0;
         while(active) {
-            // System.out.println(i + ": " + guildId);
-            // i++;
             try {
                 semaphore.updateReddit(guildId);
-                sleep(60000); // 1 minute
+                sleep(30000); // 30 seconds
             }
             catch(InterruptedException e) {
                 System.err.println(e);
