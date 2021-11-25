@@ -1,11 +1,9 @@
-import com.mongodb.DBObject;
 import com.mongodb.client.*;
-
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Projections.*;
-
 import com.mongodb.client.model.*;
+
 import net.dean.jraw.RedditClient;
 import net.dean.jraw.http.NetworkAdapter;
 import net.dean.jraw.http.OkHttpNetworkAdapter;
@@ -31,30 +29,53 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Coordinates reading/writing to the database.
+ * (NOTE: This class is NOT written as a library; all the methods are non-static.
+ * This is because concurrency/semaphore methods such as wait() are non-static.
+ * Still, there should only be one of these objects in existence at one time.)
+ * @author @eric-lu-VT (Eric Lu)
+ */
 public class UpdateDB {
 
+    // Stuff for connecting to Reddit API
     private UserAgent userAgent;
     private Credentials credentials;
     private NetworkAdapter adapter;
     private RedditClient reddit;
 
-    private MongoClient mongoClient;
-    private JDA jda;
+    private MongoClient mongoClient; // Connects to MongoDB API
 
-    private boolean updateRedditLock;
-    private boolean otherLock;
+    private boolean updateRedditLock; // lock for updateReddit(...) method
+    private boolean otherLock;        /* lock for all other read/write methods in the class
+                                         (No need for special locks for each method; MongoDB automatically
+                                         handles it for multiple concurrent operations to a single document
+                                         - see https://docs.mongodb.com/manual/core/write-operations-atomicity/) */
 
-    public UpdateDB(String REDDITUSERUSERNAME, String REDDITUSERPASSWORD, String REDDITBOTID, String REDDITBOTSECRET, String MONGOURI, JDA jda) {
+    /**
+     * UpdateDB constructor
+     * @param REDDITUSERUSERNAME Reddit username of the bot's owner
+     * @param REDDITUSERPASSWORD Reddit password of the bot's owner
+     * @param REDDITBOTID Reddit ID of the bot's owner
+     * @param REDDITBOTSECRET Bot's Reddit token
+     * @param MONGOURI Link that connects Bot to MongoDB database
+     */
+    public UpdateDB(String REDDITUSERUSERNAME, String REDDITUSERPASSWORD, String REDDITBOTID, String REDDITBOTSECRET, String MONGOURI) {
         userAgent = new UserAgent("bot", "bot", "v1.0", REDDITUSERUSERNAME);
         credentials = Credentials.script(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET);
         adapter = new OkHttpNetworkAdapter(userAgent);
         reddit = OAuthHelper.automatic(adapter, credentials);
         mongoClient = MongoClients.create(MONGOURI);
-        this.jda = jda;
         updateRedditLock = false;
         otherLock = false;
+        setIndexes();
     }
 
+    /**
+     * For the given Discord guild, search for the queries attributed to said guild,
+     * and post the results to each elligible channel in the guild.
+     * @param guildId unique ID of guild in question
+     */
     public synchronized void updateReddit(String guildId) {
         takeUpdateRedditLock();
 
@@ -63,10 +84,13 @@ public class UpdateDB {
 
         Bson queryFilter = eq("guildId", guildId);
         Bson projection = Projections.fields(Projections.include("queries", "channels"));
+
+        // Get the information pertaining to the requested guildId
         serverposts.find(queryFilter).projection(projection).forEach(doc -> {
             List<Document> queries = (List) doc.get("queries");
             List<String> channels = (List<String>) doc.get("channels");
 
+            // For all queries attributed to the given server, search each one on Reddit and get results
             queries.forEach(q -> {
                 String query = (String) q.get("query"), subreddit = (String) q.get("subreddit");
 
@@ -78,15 +102,16 @@ public class UpdateDB {
                         .query(query)
                         .build();
 
+                // double for loop here = for each query result from the Reddit search
                 for(Listing<Submission> nextPage : paginator) {
                     for(Submission s : nextPage) {
+                        // Check database if the query has been searched for, and from the current server.
                         MongoCollection<Document> redditposts = database.getCollection("redditposts");
                         FindIterable<Document> iterable = redditposts.find(Projections.fields(
                                 and(eq("postId", s.getFullName()), eq("guildId", guildId))));
 
                         if(!iterable.iterator().hasNext()) { // if iterator is empty, then entry does not already exist
-                            IndexOptions options = new IndexOptions().expireAfter(1L, TimeUnit.MINUTES);
-
+                            // Send Reddit search information to database
                             redditposts.insertOne(new Document()
                                 .append("_id", new ObjectId())
                                 .append("postId", s.getFullName())
@@ -97,6 +122,7 @@ public class UpdateDB {
                                 .append("createdAt", new Date(System.currentTimeMillis()))
                                 .append("expireAt", new Date(System.currentTimeMillis() + 60 * 60 * 1000))); // expire in 60 minutes
 
+                            // For each elligible channel in the Discord server, send query results
                             channels.forEach(channelId -> {
                                 String title = s.getTitle();
                                 if(title.length() > 253) { // For Reddit posts, max character length = 256
@@ -113,7 +139,7 @@ public class UpdateDB {
                                     .setFooter("On r/" + s.getSubreddit())
                                     .setTimestamp(Instant.ofEpochMilli(s.getCreated().getTime()));
 
-                                jda.getTextChannelById(channelId).sendMessage(embd.build()).queue();
+                                Bot.getJDA().getTextChannelById(channelId).sendMessage(embd.build()).queue();
                             });
                         }
                     }
@@ -125,7 +151,11 @@ public class UpdateDB {
         releaseUpdateRedditLock();
     }
 
-    public synchronized void setIndexes() {
+    /**
+     * Sets the indexes for the documents in the database.
+     * This ensures faster/better time complexities for database search queries.
+     */
+    private synchronized void setIndexes() {
         takeOtherLock();
 
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
@@ -136,12 +166,17 @@ public class UpdateDB {
         MongoCollection<Document> redditposts = database.getCollection("redditposts");
         redditposts.createIndex(Indexes.compoundIndex(Indexes.descending("postId"), Indexes.ascending("guildId")));
         redditposts.createIndex(Indexes.ascending("date"),
-                new IndexOptions().expireAfter(1L, TimeUnit.MINUTES));
+                new IndexOptions().expireAfter(2L, TimeUnit.HOURS)); // can change based on testing
 
         releaseOtherLock();
     }
 
-    public synchronized void addGuild(String guildID, List<String> channels) {
+    /**
+     * Adds a new guild to the database.
+     * @param guildId unique id of new guild
+     * @param channels a list of ids pertaining to channels in the guild that are eligible for the Bot to access
+     */
+    public synchronized void addGuild(String guildId, List<String> channels) {
         takeOtherLock();
 
         MongoDatabase database = mongoClient.getDatabase("reddit-scrape");
@@ -149,7 +184,7 @@ public class UpdateDB {
 
         collection.insertOne(new Document()
             .append("_id", new ObjectId())
-            .append("guildId", guildID)
+            .append("guildId", guildId)
             .append("channels", channels)
             .append("queries", Arrays.asList(new Document()
                     .append("_id", new ObjectId())
@@ -159,6 +194,10 @@ public class UpdateDB {
         releaseOtherLock();
     }
 
+    /**
+     * Removes a guild form the database.
+     * @param guildId unique id of guild to remove
+     */
     public synchronized void removeGuild(String guildId) {
         takeOtherLock();
 
@@ -171,6 +210,11 @@ public class UpdateDB {
         releaseOtherLock();
     }
 
+    /**
+     * Adds a new channel to the database.
+     * @param guildId id of guild the channel is in
+     * @param channelId id of channel to add
+     */
     public synchronized void addChannel(String guildId, String channelId) {
         takeOtherLock();
 
@@ -185,6 +229,11 @@ public class UpdateDB {
         releaseOtherLock();
     }
 
+    /**
+     * Removes a channel from the database.
+     * @param guildId id of guild the channel is in
+     * @param channelId id of channel to remove
+     */
     public synchronized void removeChannel(String guildId, String channelId) {
         takeOtherLock();
 
@@ -198,6 +247,13 @@ public class UpdateDB {
         releaseOtherLock();
     }
 
+    /**
+     * Adds a new query to a corresponding guild in the database, if it does not already exist.
+     * @param guildId id of guild to attribute query to
+     * @param queryStr query to search for
+     * @param subredditStr subreddit to search query under
+     * @return true if query add was successful (ie, the query does not already exist in the database); false otherwise
+     */
     public synchronized boolean addQuery(String guildId, String queryStr, String subredditStr) {
         takeOtherLock();
 
@@ -221,6 +277,13 @@ public class UpdateDB {
         return true;
     }
 
+    /**
+     * Removes a query from a corresponding guild in the database, if it exists.
+     * @param guildId id of guild to remove query from
+     * @param queryStr query to search for
+     * @param subredditStr subreddit to search query under
+     * @return true if query add was successful (ie, the query exists in the database); false otherwise
+     */
     public synchronized boolean removeQuery(String guildId, String queryStr, String subredditStr) {
         takeOtherLock();
 
@@ -241,6 +304,9 @@ public class UpdateDB {
         return true;
     }
 
+    /**
+     * Sets updateRedditLock.
+     */
     private synchronized void takeUpdateRedditLock() {
         while(updateRedditLock && otherLock) {
             try {
@@ -253,11 +319,17 @@ public class UpdateDB {
         updateRedditLock = true;
     }
 
+    /**
+     * Releases updateRedditLock.
+     */
     private synchronized void releaseUpdateRedditLock() {
         updateRedditLock = false;
         notifyAll();
     }
 
+    /**
+     * Sets otherLock.
+     */
     private synchronized void takeOtherLock()  {
         while(updateRedditLock) {
             try {
@@ -270,6 +342,9 @@ public class UpdateDB {
         otherLock = true;
     }
 
+    /**
+     * Releases otherLock.
+     */
     private synchronized void releaseOtherLock() {
         otherLock = false;
         notifyAll();

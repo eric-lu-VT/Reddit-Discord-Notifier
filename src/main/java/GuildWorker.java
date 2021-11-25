@@ -1,33 +1,40 @@
-import java.util.Timer;
+/**
+ * Repeatedly runs the script for a given guild, until it is told to stop.
+ * @author @eric-lu-VT (Eric Lu)
+ */
 
 public class GuildWorker extends Thread {
-    private String guildId;
-    private UpdateDB semaphore;
-    Timer timer;
-    boolean active;
+    private String guildId; // unique ID of guild
+    boolean active;         // true if the script should be running; false otherwise
 
-    public GuildWorker(String guildId, UpdateDB semaphore) {
+    /**
+     * GuildWorker constructor
+     * @param guildId unique ID of guild
+     */
+    public GuildWorker(String guildId) {
         this.guildId = guildId;
-        this.semaphore = semaphore;
-        timer = new Timer();
         active = true;
     }
 
+    /**
+     * Repeatedly runs the script, until it is told to stop.
+     */
     @Override
     public void run() {
         while(active) {
             try {
-                semaphore.updateReddit(guildId);
+                Bot.getSemaphore().updateReddit(guildId);
                 sleep(30000); // 30 seconds
             }
             catch(InterruptedException e) {
                 System.err.println(e);
             }
         }
-        timer.cancel();
-        timer.purge();
     }
 
+    /**
+     * Tells the thread to stop running the script.
+     */
     public void stopActive() {
         active = false;
     }

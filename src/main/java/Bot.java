@@ -1,4 +1,3 @@
-import java.net.UnknownHostException;
 import java.time.*;
 import java.util.*;
 import javax.security.auth.login.LoginException;
@@ -9,29 +8,35 @@ import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildLeaveEvent;
 import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.utils.Compression;
-import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.internal.utils.PermissionUtil;
-import org.bson.Document;
+
+/**
+ * Automatically detects new posts made on Reddit that match the specified
+ * queries and are in the specified subreddits, and sends them to Discord.
+ * @author @eric-lu-VT (Eric Lu)
+ */
 
 public class Bot extends ListenerAdapter {
 
-    private static final String DISCORDBOTTOKEN = System.getenv("DISCORDBOTTOKEN");
-    // private static final String DISCORDID = System.getenv("DISCORDID");
-    // private static final String USERAGENT = "Whatever";
-    private static final String REDDITBOTID = System.getenv("REDDITBOTID");
-    private static final String REDDITBOTSECRET = System.getenv("REDDITBOTSECRET");
-    private static final String REDDITUSERUSERNAME = System.getenv("REDDITUSERUSERNAME");
-    private static final String REDDITUSERPASSWORD = System.getenv("REDDITUSERPASSWORD");
-    private static final String MONGOURI = System.getenv("MONGOURI");
+    // Client secret variables
+    private static final String DISCORDBOTTOKEN = System.getenv("DISCORDBOTTOKEN");         // Bot's Discord token
+    private static final String REDDITBOTID = System.getenv("REDDITBOTID");                 // Reddit ID of the bot's owner
+    private static final String REDDITBOTSECRET = System.getenv("REDDITBOTSECRET");         // Bot's Reddit token
+    private static final String REDDITUSERUSERNAME = System.getenv("REDDITUSERUSERNAME");   // Reddit username of the bot's owner
+    private static final String REDDITUSERPASSWORD = System.getenv("REDDITUSERPASSWORD");   // Reddit password of the bot's owner
+    private static final String MONGOURI = System.getenv("MONGOURI");                       // Link that connects Bot to MongoDB database
 
-    private static Map<String, GuildWorker> map;
-    private static UpdateDB semaphore;
-    private static JDA jda;
+    private static Map<String, GuildWorker> map;    // { GuildId -> GuildWorker }
+    private static UpdateDB semaphore;              // All updates to database must be done on this object
+    private static JDA jda;                         // Discord API
 
+    /**
+     * Driver; formally turns on bot & initializes slash commands.
+     * @param args system stuff
+     * @throws LoginException if provided DISCORDBOTTOKEN is invalid
+     */
     public static void main(String[] args) throws LoginException {
         jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
         jda.getPresence().setStatus(OnlineStatus.IDLE);
@@ -49,25 +54,48 @@ public class Bot extends ListenerAdapter {
                 .addOption(OptionType.STRING, "query-subreddit", "/removequery (query) (subreddit) - Subreddit is last space sep. keyword provided; default = all)", true).queue();
 
         map = new HashMap<>();
-        semaphore = new UpdateDB(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET, MONGOURI, jda);
-        semaphore.setIndexes();
+        semaphore = new UpdateDB(REDDITUSERUSERNAME, REDDITUSERPASSWORD, REDDITBOTID, REDDITBOTSECRET, MONGOURI);
     }
 
+    /**
+     * Gets the singular JDA object.
+     * @return the singular JDA object
+     */
+    public static JDA getJDA() {
+        return jda;
+    }
+
+    /**
+     * Gets the singular UpdateDB object.
+     * @return the singular UpdateDB object
+     */
+    public static UpdateDB getSemaphore() {
+        return semaphore;
+    }
+
+    /**
+     * Processes to run when bot first connects to Discord.
+     * @param event input that indicates JDA has finished loading all entities
+     */
     @Override
     public void onReady(ReadyEvent event) {
         System.out.println("Bot ready");
     }
 
+    /**
+     * Processes to run when a slash command is received.
+     * @param event information pertaining to a slash command usage
+     */
     @Override
     public void onSlashCommand(SlashCommandEvent event) {
-        if(event.getName().equals("ping")) {
+        if(event.getName().equals("ping")) {    // ping command
             long time = System.currentTimeMillis();
             event.reply("Pong!").setEphemeral(true) // reply or acknowledge
                     .flatMap(v ->
                             event.getHook().editOriginalFormat("Pong: %d ms", System.currentTimeMillis() - time) // then edit original
                     ).queue(); // Queue both reply and edit
         }
-        else if(event.getName().equals("start")) {
+        else if(event.getName().equals("start")) {  // starts running search script in the corresponding guild
             if(map.containsKey(event.getGuild().getId())) {
                 EmbedBuilder embd = new EmbedBuilder();
                 embd.setColor(0xe74c3c)
@@ -79,7 +107,7 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
             else {
-                map.put(event.getGuild().getId(), new GuildWorker(event.getGuild().getId(), semaphore));
+                map.put(event.getGuild().getId(), new GuildWorker(event.getGuild().getId()));
                 map.get(event.getGuild().getId()).start();
 
                 EmbedBuilder embd = new EmbedBuilder();
@@ -92,7 +120,7 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
         }
-        else if(event.getName().equals("stop")) {
+        else if(event.getName().equals("stop")) {   // stops running search script in the corresponding guild
             if(!map.containsKey(event.getGuild().getId())) {
                 EmbedBuilder embd = new EmbedBuilder();
                 embd.setColor(0xe74c3c)
@@ -117,7 +145,7 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
         }
-        else if(event.getName().equals("addchannel")) {
+        else if(event.getName().equals("addchannel")) { // add channel to corresponding guild in the database
             semaphore.addChannel(event.getGuild().getId(), event.getChannel().getId());
 
             EmbedBuilder embd = new EmbedBuilder();
@@ -131,7 +159,7 @@ public class Bot extends ListenerAdapter {
 
             event.replyEmbeds(Arrays.asList(embd.build())).queue();
         }
-        else if(event.getName().equals("removechannel")) {
+        else if(event.getName().equals("removechannel")) {  // remove channel from the corresponding guild in the database
             semaphore.removeChannel(event.getGuild().getId(), event.getChannel().getId());
 
             EmbedBuilder embd = new EmbedBuilder();
@@ -145,10 +173,10 @@ public class Bot extends ListenerAdapter {
 
             event.replyEmbeds(Arrays.asList(embd.build())).queue();
         }
-        else if(event.getName().equals("addquery")) {
+        else if(event.getName().equals("addquery")) { // add query to corresponding guild in the database, if it does not already exist
+            // Processes which search term and subreddit to look for
             String[] query = event.getOption("query-subreddit").getAsString().split(" ");
             StringBuilder queryStr = new StringBuilder(), subredditStr = new StringBuilder();
-
             if(query.length >= 1) {
                 if(query.length == 1) {
                     queryStr.append(query[0].toLowerCase());
@@ -186,7 +214,7 @@ public class Bot extends ListenerAdapter {
                 event.replyEmbeds(Arrays.asList(embd.build())).queue();
             }
         }
-        else if(event.getName().equals("removequery")) {
+        else if(event.getName().equals("removequery")) {    // remove query from corresponding guild in the database, if it exists
             String[] query = event.getOption("query-subreddit").getAsString().split(" ");
             StringBuilder queryStr = new StringBuilder(), subredditStr = new StringBuilder();
 
@@ -229,6 +257,10 @@ public class Bot extends ListenerAdapter {
         }
     }
 
+    /**
+     * Processes to run when a new guild adds the Bot as a member.
+     * @param event information pertaining the Bot being added
+     */
     @Override
     public void onGuildJoin(GuildJoinEvent event) {
         List<String> channels = new ArrayList<>();
@@ -244,6 +276,10 @@ public class Bot extends ListenerAdapter {
         semaphore.addGuild(event.getGuild().getId(), channels);
     }
 
+    /**
+     * Processes to run when a guild removes the Bot as a member.
+     * @param event information pertaining to the Bot being removed
+     */
     @Override
     public void onGuildLeave(GuildLeaveEvent event) {
         semaphore.removeGuild(event.getGuild().getId());
