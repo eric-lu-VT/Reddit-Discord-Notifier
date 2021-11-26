@@ -21,9 +21,9 @@ Here is a pseudocode outline of how the bot works:
           - If yes, do nothing (if the database has the entry, it means it has been searched for from the current server already)
           - If no, send the query to Discord, and send the query to the database with an expiration date of two hours
 - Constantly listen for other commands/events
-    - If user runs comamand ( ```/ping``` or ```/addchannel``` or ```/removechannel``` or  ```/addquery [query] [subreddit]``` or ```/removequery [query] [subreddit]```), respond appropriately
-    - If Bot is added to new server, add the corresponding server info to the database
-    - If Bot is removed from a server, remove the corresponding server info from the database
+    - If user runs comamand ( ```/ping``` or ```/addchannel``` or ```/removechannel``` or  ```/addquery [query] [subreddit]``` or ```/removequery [query] [subreddit]```), respond appropriately through ```UpdateDB``` (if needed)
+    - If Bot is added to new server, add the corresponding server info to the database through ```UpdateDB```
+    - If Bot is removed from a server, remove the corresponding server info from the database through ```UpdateDB```
 - For read/write requests to database, keep operations in sync with ```updateRedditLock``` and ```otherLock```.
   - ```updateRedditLock``` is a lock for the ```updateReddit(...)``` method, while ```otherLock``` is a lock for all the other read/write methods. 
     - No need for special locks for each method; MongoDB automatically handles it for multiple concurrent operations to a single document, as described [here](https://docs.mongodb.com/manual/core/write-operations-atomicity/).
