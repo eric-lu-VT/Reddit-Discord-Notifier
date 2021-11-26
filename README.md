@@ -13,7 +13,7 @@ This is a rewrite of an [old version](https://github.com/eric-lu-VT/DEPRECATED-R
 
 Here is a pseudocode outline of how the bot works:
 - On login, initialize commands to Discord API.
-- When a Discord server requests to start script (```/start```)
+- When a Discord server requests to start script (```/start```):
   - Begin a new ```GuildWorker``` thread attributed to the given Discord server. The thread will use ```UpdateDB``` methods for any database updates. The thread also runs the following script:
     - Every 30 seconds until script told to stop (```/stop```, or server removes Bot while script is in action), do the following:
       - For all queries attributed to the given server, search each one on Reddit and get results
