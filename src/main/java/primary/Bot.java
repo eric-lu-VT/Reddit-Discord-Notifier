@@ -1,4 +1,7 @@
+package primary;
+
 import java.time.*;
+import java.io.*;
 import java.util.*;
 import javax.security.auth.login.LoginException;
 
@@ -21,23 +24,25 @@ import net.dv8tion.jda.internal.utils.PermissionUtil;
 public class Bot extends ListenerAdapter {
 
     // Client secret variables
-    private static final String DISCORDBOTTOKEN = System.getenv("DISCORDBOTTOKEN");         // Bot's Discord token
-    private static final String REDDITBOTID = System.getenv("REDDITBOTID");                 // Reddit ID of the bot's owner
-    private static final String REDDITBOTSECRET = System.getenv("REDDITBOTSECRET");         // Bot's Reddit token
-    private static final String REDDITUSERUSERNAME = System.getenv("REDDITUSERUSERNAME");   // Reddit username of the bot's owner
-    private static final String REDDITUSERPASSWORD = System.getenv("REDDITUSERPASSWORD");   // Reddit password of the bot's owner
-    private static final String MONGOURI = System.getenv("MONGOURI");                       // Link that connects Bot to MongoDB database
+    private static String DISCORDBOTTOKEN = Config.DISCORDBOTTOKEN;         // Bot's Discord token
+    private static String REDDITBOTID = Config.REDDITBOTID;                 // Reddit ID of the bot's owner
+    private static String REDDITBOTSECRET = Config.REDDITBOTSECRET;         // Bot's Reddit token
+    private static String REDDITUSERUSERNAME = Config.REDDITUSERUSERNAME;   // Reddit username of the bot's owner
+    private static String REDDITUSERPASSWORD = Config.REDDITUSERPASSWORD;   // Reddit password of the bot's owner
+    private static String MONGOURI = Config.MONGOURI;                       // Link that connects Bot to MongoDB database
 
-    private static Map<String, GuildWorker> map;    // { GuildId -> GuildWorker }
+    private static Map<String, GuildWorker> map;    // { GuildId -> primary.GuildWorker }
     private static UpdateDB semaphore;              // All updates to database must be done on this object
     private static JDA jda;                         // Discord API
 
     /**
-     * Driver; formally turns on bot & initializes slash commands.
+     * Driver: initializes config variables, formally turns on bot, and initializes slash commands.
      * @param args system stuff
      * @throws LoginException if provided DISCORDBOTTOKEN is invalid
      */
     public static void main(String[] args) throws LoginException {
+        Config prop = new Config();
+
         jda = JDABuilder.createDefault(DISCORDBOTTOKEN).build();
         jda.getPresence().setStatus(OnlineStatus.IDLE);
         jda.getPresence().setActivity(Activity.watching("Script not running currently"));
@@ -66,8 +71,8 @@ public class Bot extends ListenerAdapter {
     }
 
     /**
-     * Gets the singular UpdateDB object.
-     * @return the singular UpdateDB object
+     * Gets the singular primary.UpdateDB object.
+     * @return the singular primary.UpdateDB object
      */
     public static UpdateDB getSemaphore() {
         return semaphore;

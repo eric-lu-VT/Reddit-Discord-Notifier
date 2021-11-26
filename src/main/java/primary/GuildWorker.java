@@ -1,3 +1,5 @@
+package primary;
+
 /**
  * Repeatedly runs the script for a given guild, until it is told to stop.
  * @author @eric-lu-VT (Eric Lu)
@@ -8,7 +10,7 @@ public class GuildWorker extends Thread {
     boolean active;         // true if the script should be running; false otherwise
 
     /**
-     * GuildWorker constructor
+     * primary.GuildWorker constructor
      * @param guildId unique ID of guild
      */
     public GuildWorker(String guildId) {

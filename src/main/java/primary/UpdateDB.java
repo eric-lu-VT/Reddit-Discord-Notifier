@@ -1,3 +1,5 @@
+package primary;
+
 import com.mongodb.client.*;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
@@ -14,11 +16,9 @@ import net.dean.jraw.models.Submission;
 import net.dean.jraw.models.TimePeriod;
 import net.dean.jraw.oauth.Credentials;
 import net.dean.jraw.oauth.OAuthHelper;
-import net.dean.jraw.pagination.DefaultPaginator;
 import net.dean.jraw.pagination.Paginator;
 import net.dean.jraw.pagination.SearchPaginator;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.JDA;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -53,12 +53,12 @@ public class UpdateDB {
                                          - see https://docs.mongodb.com/manual/core/write-operations-atomicity/) */
 
     /**
-     * UpdateDB constructor
+     * primary.UpdateDB constructor
      * @param REDDITUSERUSERNAME Reddit username of the bot's owner
      * @param REDDITUSERPASSWORD Reddit password of the bot's owner
      * @param REDDITBOTID Reddit ID of the bot's owner
-     * @param REDDITBOTSECRET Bot's Reddit token
-     * @param MONGOURI Link that connects Bot to MongoDB database
+     * @param REDDITBOTSECRET primary.Bot's Reddit token
+     * @param MONGOURI Link that connects primary.Bot to MongoDB database
      */
     public UpdateDB(String REDDITUSERUSERNAME, String REDDITUSERPASSWORD, String REDDITBOTID, String REDDITBOTSECRET, String MONGOURI) {
         userAgent = new UserAgent("bot", "bot", "v1.0", REDDITUSERUSERNAME);
@@ -174,7 +174,7 @@ public class UpdateDB {
     /**
      * Adds a new guild to the database.
      * @param guildId unique id of new guild
-     * @param channels a list of ids pertaining to channels in the guild that are eligible for the Bot to access
+     * @param channels a list of ids pertaining to channels in the guild that are eligible for the primary.Bot to access
      */
     public synchronized void addGuild(String guildId, List<String> channels) {
         takeOtherLock();

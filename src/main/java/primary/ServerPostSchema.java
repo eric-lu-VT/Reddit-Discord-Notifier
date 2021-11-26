@@ -1,3 +1,5 @@
+package primary;
+
 import java.util.*;
 
 public class ServerPostSchema {
