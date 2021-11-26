@@ -50,3 +50,5 @@ Here is a pseudocode outline of how the bot works:
 
 ## Roadmap
 - Add POJOs (basically the way to implement schemas for Java MongoDB)
+- Use an actual ```.config``` file or ```.env``` variables
+  - For whatever reason, it's just really hard to set up between Java boilerplate, ```.jar``` stuff, and the ubuntu terminal for hosting
