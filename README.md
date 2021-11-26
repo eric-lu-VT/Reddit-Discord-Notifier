@@ -38,7 +38,7 @@ Here is a pseudocode outline of how the bot works:
 - ```/removequery [query] [subreddit]```: Removes a query (search term, subreddit) from the search list attributed to the respective Discord server, if such an entry **does** already exist. (Subreddit is last space separated keyword provided; defaults to "all" if only one space separated keyword provided.)
 
 ### Architecture
-![img](https://i.imgur.com/zNnyjBl.png)
+![img](https://i.imgur.com/b67KCcz.jpg)
 
 ## Public Version Installation
 [Click here](https://discord.com/api/oauth2/authorize?client_id=912892084875321356&permissions=2147568640&scope=bot%20applications.commands) to invite the bot to your server.
