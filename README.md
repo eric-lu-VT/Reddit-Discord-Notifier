@@ -14,11 +14,12 @@ This is a rewrite of an [old version](https://github.com/eric-lu-VT/DEPRECATED-R
 Here is a pseudocode outline of how the bot works:
 - On login, initialize commands to Discord API.
 - When a Discord server requests to start script (```/start```)
-  - Every 30 seconds until script told to stop (```/stop```, or server removes Bot while script is in action), do the following:
-    - For all queries attributed to the given server, search each one on Reddit and get results
-      - For each result from the Reddit search, check database if results has been searched for, and from the current server.
-        - If yes, do nothing (if the database has the entry, it means it has been searched for from the current server already)
-        - If no, send the query to Discord, and send the query to the database with an expiration date of two hours
+  - Begin a new ```GuildWorker``` thread, which calls ```UpdateDB``` for any database updates. The thread also runs the following script:
+    - Every 30 seconds until script told to stop (```/stop```, or server removes Bot while script is in action), do the following:
+      - For all queries attributed to the given server, search each one on Reddit and get results
+        - For each result from the Reddit search, check database if results has been searched for, and from the current server.
+          - If yes, do nothing (if the database has the entry, it means it has been searched for from the current server already)
+          - If no, send the query to Discord, and send the query to the database with an expiration date of two hours
 - Constantly listen for other commands/events
     - If user runs comamand ( ```/ping``` or ```/addchannel``` or ```/removechannel``` or  ```/addquery [query] [subreddit]``` or ```/removequery [query] [subreddit]```), respond appropriately
     - If Bot is added to new server, add the corresponding server info to the database
