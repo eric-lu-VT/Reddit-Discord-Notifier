@@ -45,13 +45,7 @@ Here is a pseudocode outline of how the bot works:
 ![img](https://i.imgur.com/b67KCcz.jpg)
 
 ## Public Version Installation
-[Click here](https://discord.com/api/oauth2/authorize?client_id=912892084875321356&permissions=2147568640&scope=bot%20applications.commands) to invite the bot to your server.
-- Bot has the following permissions:
-    - ```Send Messages```
-    - ```Read Message History```
-    - ```Use Slash Commands```
-    - ```Read Messages/View Channels```
-    - ```Embed Links```
+No longer available. 
 
 ## Self-Hosting Installation
 [See here](https://github.com/eric-lu-VT/Reddit-Discord-Notifier/wiki) for instructions on how to self-host this bot.
