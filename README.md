@@ -1,5 +1,9 @@
 # Reddit-Discord-Notifier
 
+Note: Due to the recent Reddit API changes, the public bot is no longer invitable. 
+
+----------------------
+
 Automatically detects new posts made on Reddit that match the specified queries and are in the specified subreddits, and sends them to Discord.
 
 ## Impressions
